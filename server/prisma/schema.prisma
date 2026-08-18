@@ -1,0 +1,776 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  STUDENT
+  CONTRIBUTOR
+  MODERATOR
+}
+
+
+enum QuestionType {
+  MCQ
+}
+
+// Add enum for quiz attempt status
+enum AttemptStatus {
+  IN_PROGRESS
+  COMPLETED
+  ABANDONED
+}
+
+enum MaterialType {
+  PDF
+  DOCUMENT
+  PRESENTATION
+  VIDEO
+  AUDIO
+  IMAGE
+  CODE
+  LINK
+  OTHER
+}
+
+enum MaterialLevel {
+  COURSE
+  SKILL_CATEGORY
+  EXPERTISE
+  MODULE
+  CHAPTER
+  LESSON
+}
+
+enum CourseStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  PUBLISHED
+  REJECTED
+}
+
+enum CourseFlag {
+  DEMO
+  FREE
+  PAID
+  COMING_SOON
+  FREE_TRIAL
+  ON_DEMAND
+}
+
+enum ModuleLevel {
+  LEARNER
+  PRACTITIONER
+  PROFESSIONAL
+}
+
+enum NotificationType {
+  COURSE_SUBMITTED
+  COURSE_APPROVED
+  COURSE_REJECTED
+  COURSE_PUBLISHED
+  CHAPTER_SUBMITTED
+  CHAPTER_APPROVED
+  CHAPTER_REJECTED
+  LESSON_SUBMITTED
+  LESSON_APPROVED
+  LESSON_REJECTED
+  USER_CREATED
+}
+
+enum EntityType {
+  COURSE
+  CHAPTER
+  LESSON
+}
+
+
+enum WorkflowAction {
+  CREATED
+  SUBMITTED
+  APPROVED
+  REJECTED
+  PUBLISHED
+  FLAG_CHANGED
+  STATUS_CHANGED
+}
+
+model User {
+  id       String   @id @default(cuid())
+  name     String
+  email    String   @unique
+  password String
+  role     UserRole
+
+  // ✅ New fields for student signup
+  goal            String?  // e.g., "Career Change", "Skill Enhancement", "Certification"
+  currentStatus   String?  // e.g., "Student", "Professional", "Unemployed", "Entrepreneur"
+  emailVerified   Boolean  @default(false)
+  otp             String?
+  otpExpiry       DateTime?
+  
+  // ✅ Profile fields
+  profilePhoto    String?
+  phone           String?
+  bio             String?
+  dateOfBirth     DateTime?
+  location        String?
+  website         String?
+  linkedinUrl     String?
+  twitterUrl      String?
+  
+  // ✅ Email change fields
+  newEmail        String?
+  emailChangeOtp  String?
+  emailChangeOtpExpiry DateTime?
+  
+  // Social login fields (for future implementation)
+  googleId        String?
+  githubId        String?
+  linkedinId      String?
+
+  isActive        Boolean           @default(true)
+  isBlocked       Boolean           @default(false)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  createdBy       String?
+  updatedBy       String?
+  Purchase        Purchase[]
+  UserLessonNotes UserLessonNotes[]
+  QuestionReply   QuestionReply[]
+  LessonQuestion  LessonQuestion[]
+  QuizAttempt     QuizAttempt[]
+  ViewingHistory  ViewingHistory[]
+  BillingInfo     BillingInfo[]
+  Notification    Notification[]
+  WorkflowHistory WorkflowHistory[]
+  CartItem        CartItem[]
+  FaqBlock        FaqBlock[]
+}
+
+model BillingInfo {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Billing address
+  fullName        String
+  email           String
+  phone           String?
+  addressLine1    String
+  addressLine2    String?
+  city            String
+  state           String?
+  postalCode      String
+  country         String
+  
+  // Payment method (optional - for saved cards)
+  cardLast4       String?
+  cardBrand       String?
+  cardExpiryMonth Int?
+  cardExpiryYear  Int?
+  
+  isDefault       Boolean  @default(false)
+  
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  createdBy       String?
+  updatedBy       String?
+  
+  @@index([userId])
+  @@index([userId, isDefault])
+}
+
+
+model Category {
+  id          String @id @default(cuid())
+  name        String 
+  description String
+  tumbnailUrl String?
+
+  isActive    Boolean       @default(true)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  createdBy   String?
+  updatedBy   String?
+  SubCategory SubCategory[]
+  Course      Course[]
+}
+
+model SubCategory {
+  id          String   @id @default(cuid())
+  name        String   
+  description String
+  tumbnailUrl String?
+  categoryId  String?
+  category    Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  createdBy String?
+  updatedBy String?
+  Course    Course[]
+}
+
+model Course {
+  id            String      @id @default(cuid())
+  title         String
+  description   String
+  published     Boolean     @default(true)
+  categoryId    String
+  category      Category    @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  subCategoryId String
+  subCategory   SubCategory @relation(fields: [subCategoryId], references: [id], onDelete: Cascade)
+  tumbnailUrl   String?
+
+  status        CourseStatus @default(DRAFT)
+  flags         CourseFlag[]
+
+  submittedAt   DateTime?
+  submittedBy   String?
+  approvedAt    DateTime?
+  approvedBy   String?
+  rejectedAt    DateTime?
+  rejectedBy   String?
+  rejectionReason String?
+
+  isActive      Boolean         @default(true)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  createdBy     String?
+  updatedBy     String?
+  SkillCategory SkillCategory[]
+  Material      Material[]
+
+  @@index([status])
+  @@index([submittedBy])
+  @@index([approvedBy])
+  @@index([createdBy])
+}
+
+
+model Material {
+  id          String        @id @default(cuid())
+  title       String
+  description String?
+  fileUrl     String?
+  fileName    String?
+  fileType    String?
+  fileSize    Int?          // Size in bytes
+  materialType MaterialType
+  materialLevel MaterialLevel
+  
+  // Flexible attachment - can be attached to any level
+  courseId        String?
+  skillCategoryId String?
+  expertiseId     String?
+  moduleId        String?
+  chapterId       String?
+  lessonId        String?
+  
+  // Relations
+  course        Course?        @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  skillCategory SkillCategory? @relation(fields: [skillCategoryId], references: [id], onDelete: Cascade)
+  expertise     Expertise?     @relation(fields: [expertiseId], references: [id], onDelete: Cascade)
+  module        Module?         @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  chapter       Chapters?       @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+  lesson        Lessons?        @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  
+  // Material properties
+  isRequired    Boolean        @default(false)
+  isDownloadable Boolean       @default(true)
+  order         Int            @default(0)
+  externalUrl   String?        // For LINK type materials
+  
+  isActive      Boolean        @default(true)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  createdBy     String?
+  updatedBy     String?
+
+  @@index([courseId])
+  @@index([skillCategoryId])
+  @@index([expertiseId])
+  @@index([moduleId])
+  @@index([chapterId])
+  @@index([lessonId])
+  @@index([materialType])
+  @@index([materialLevel])
+}
+
+model SkillCategory {
+  id          String @id @default(cuid())
+  name        String 
+  description String
+  courseId    String
+  course      Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  order       Int    @default(0)
+  isPublished Boolean @default(true)
+
+  isActive  Boolean     @default(true)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  createdBy String?
+  updatedBy String?
+  Expertise Expertise[]
+  Material  Material[]  
+  tumbnailUrl String?
+}
+
+model Expertise {
+  id              String        @id @default(cuid())
+  name            String
+  description     String
+  skillCategoryId String
+  skillCategory   SkillCategory @relation(fields: [skillCategoryId], references: [id], onDelete: Cascade)
+  order           Int           @default(0)
+  isPublished     Boolean       @default(true)
+
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  createdBy String?
+  updatedBy String?
+  Module    Module[]
+  Material  Material[]
+  levels    ModuleLevel[] @default([])
+  tumbnailUrl String? 
+}
+
+model Module {
+  id          String    @id @default(cuid())
+  title       String
+  description String
+  expertiseId String
+  expertise   Expertise @relation(fields: [expertiseId], references: [id], onDelete: Cascade)
+  levels      ModuleLevel[]  @default([])
+  order       Int       @default(0)
+  isPublished Boolean   @default(true)
+
+  isActive  Boolean    @default(true)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  createdBy String?
+  updatedBy String?
+  Chapters  Chapters[]
+  Material  Material[]
+  tumbnailUrl String?  
+}
+
+model Chapters {
+  id       String @id @default(cuid())
+  title    String
+  content  String
+  price    Float
+  moduleId String
+  module   Module @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  order    Int    @default(0)
+
+  status        CourseStatus @default(DRAFT)
+  flags         CourseFlag[]
+
+  submittedAt   DateTime?
+  submittedBy   String?
+  approvedAt   DateTime?
+  approvedBy   String?
+  rejectedAt   DateTime?
+  rejectedBy   String?
+  rejectionReason String?
+
+  isActive  Boolean    @default(true)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  createdBy String?
+  updatedBy String?
+  Lessons   Lessons[]
+  Purchase  Purchase[]
+  Quiz      Quiz[]
+  Material  Material[]
+  CartItem  CartItem[]
+  tumbnailUrl String?
+
+  @@index([status])
+  @@index([submittedBy])
+  @@index([approvedBy])
+  @@index([createdBy])
+}
+
+
+model Lessons {
+  id        String   @id @default(cuid())
+  title     String
+  content   String
+  chapterId String
+  chapter   Chapters @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+  order     Int      @default(0)
+
+  status        CourseStatus @default(DRAFT)
+  flags         CourseFlag[]
+
+  submittedAt   DateTime?
+  submittedBy   String?
+  approvedAt    DateTime?
+  approvedBy   String?
+  rejectedAt    DateTime?
+  rejectedBy   String?
+  rejectionReason String?
+
+  isActive        Boolean           @default(true)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  createdBy       String?
+  updatedBy       String?
+  Video           Video[]
+  UserLessonNotes UserLessonNotes[]
+  LessonQuestion  LessonQuestion[]
+  ViewingHistory  ViewingHistory[]
+  Material        Material[]
+  FaqBlock        FaqBlock[]
+  tumbnailUrl String?
+
+  @@index([status])
+  @@index([submittedBy])
+  @@index([approvedBy])
+  @@index([createdBy])
+}
+
+model Video {
+  id       String  @id @default(cuid())
+  url      String
+  duration Int
+  lessonId String
+  lesson   Lessons @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ViewingHistory ViewingHistory[]
+  createdBy String?
+  updatedBy String?
+}
+
+model ViewingHistory {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lessonId   String
+  lesson     Lessons  @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  videoId    String?
+  video      Video?   @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  currentTime Float   @default(0) // Current position in seconds
+  duration   Float    @default(0) // Total video duration
+  progress   Float    @default(0) // Percentage completed (0-100)
+  isCompleted Boolean @default(false)
+  
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  // ✅ Use composite unique index that handles null properly
+  @@unique([userId, lessonId, videoId])
+  @@index([userId])
+  @@index([lessonId])
+  @@index([videoId])
+  @@index([isCompleted])
+  @@index([userId, isCompleted])
+}
+
+model Quiz {
+  id              String         @id @default(cuid())
+  title           String
+  description     String?
+  instruction     String?
+  duration        Int?           // Duration in minutes
+  maxAttempts     Int            @default(3)
+  passingScore    Float          @default(60.0) // Percentage
+  allowReview     Boolean        @default(true) // Allow reviewing answers after completion
+  showResultsImmediately Boolean @default(true) // Show results instantly after submission
+  chapterId       String         // Make required, remove optional
+  chapter         Chapters       @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+  questions       QuizQuestion[]
+  attempts        QuizAttempt[]
+  isActive        Boolean        @default(true)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  createdBy       String?
+  updatedBy       String?
+
+  @@index([chapterId])
+}
+
+model QuizQuestion {
+  id              String         @id @default(cuid())
+  quizId          String
+  quiz            Quiz           @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  questionText    String
+  questionType    QuestionType
+  points          Float          @default(1.0)
+  order           Int
+  explanation     String?        // Explanation shown after answer
+  allowMultipleCorrect Boolean   @default(false) // Allow multiple correct answers
+  options         QuizOption[]
+  answers         QuizAnswer[]
+  isActive        Boolean        @default(true)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  @@index([quizId])
+}
+
+model QuizOption {
+  id          String        @id @default(cuid())
+  questionId  String
+  question    QuizQuestion  @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  optionText  String
+  isCorrect   Boolean       @default(false)
+  order       Int
+  isActive    Boolean       @default(true)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@index([questionId])
+}
+
+model QuizAttempt {
+  id            String          @id @default(cuid())
+  quizId        String
+  quiz          Quiz            @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  userId        String
+  user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  startedAt     DateTime        @default(now())
+  completedAt   DateTime?
+  score         Float?
+  totalPoints   Float?
+  percentage    Float?
+  status        AttemptStatus   @default(IN_PROGRESS)
+  answers       QuizAnswer[]
+  isActive      Boolean         @default(true)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  @@index([quizId])
+  @@index([userId])
+}
+
+model QuizAnswer {
+  id                String        @id @default(cuid())
+  attemptId         String
+  attempt           QuizAttempt   @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  questionId        String
+  question          QuizQuestion  @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  selectedOptionId  String?       // For single-select MCQ
+  selectedOptionIds String[]      // For multi-select MCQ
+  textAnswer        String?       // For short answer/essay
+  points            Float?
+  isCorrect         Boolean?
+  gradedAt          DateTime?
+  isActive          Boolean       @default(true)
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  @@index([attemptId])
+  @@index([questionId])
+}
+
+model Purchase {
+  id         String   @id @default(cuid())
+  userId     String
+  chapterId  String
+  amount     Float
+  purchaseAt DateTime @default(now())
+
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  chapter Chapters @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  createdBy String?
+  updatedBy String?
+  courseId  String?
+}
+
+model UserLessonNotes {
+  id       String  @id @default(cuid())
+  content  String
+  lessonId String
+  lesson   Lessons @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  userId   String
+  user     User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  createdBy String?
+  updatedBy String?
+}
+
+model LessonQuestion {
+  id        String          @id @default(cuid())
+  question  String
+  lessonId  String
+  userId    String
+  lesson    Lessons         @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  replies   QuestionReply[]
+  isActive  Boolean         @default(true)
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+}
+
+model QuestionReply {
+  id         String          @id @default(cuid())
+  reply      String
+  questionId String
+  parentId   String?
+  userId     String
+  parent     QuestionReply?  @relation("ReplyHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
+  children   QuestionReply[] @relation("ReplyHierarchy")
+  question   LessonQuestion  @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  user         User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  isAdminReply Boolean         @default(false)
+  isActive     Boolean         @default(true)
+  createdAt    DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+}
+
+model Notification {
+  id              String           @id @default(cuid())
+  userId          String
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type            NotificationType
+  title           String
+  message         String
+  relatedEntityType EntityType?
+  relatedEntityId String?
+  isRead          Boolean          @default(false)
+  readAt          DateTime?
+  createdAt       DateTime        @default(now())
+
+  @@index([userId])
+  @@index([userId, isRead])
+  @@index([relatedEntityType, relatedEntityId])
+  @@index([createdAt])
+}
+
+model WorkflowHistory {
+  id              String         @id @default(cuid())
+  entityType      EntityType
+  entityId        String
+  statusFrom      CourseStatus?
+  statusTo        CourseStatus?
+  action          WorkflowAction
+  performedBy     String
+  performedByName String
+  user            User           @relation(fields: [performedBy], references: [id], onDelete: Cascade)
+  metadata        Json?          // Stores rejection reason, flags changed, etc.
+  createdAt       DateTime       @default(now())
+
+  @@index([entityType, entityId])
+  @@index([performedBy])
+  @@index([createdAt])
+  @@index([statusTo])
+}
+
+model ContactSubmission {
+  id        String   @id @default(cuid())
+  name      String
+  email     String
+  phone     String?
+  subject   String
+  message   String
+  isRead    Boolean  @default(false)
+  readAt    DateTime?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isRead])
+  @@index([createdAt])
+}
+
+model CartItem {
+  id        String   @id @default(cuid())
+  userId    String
+  chapterId String
+  
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  chapter   Chapters @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+  
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, chapterId])
+  @@index([userId])
+  @@index([chapterId])
+}
+
+model FaqBlock {
+  id        String   @id @default(cuid())
+  userId    String
+  lessonId  String?  // If set, blocked for this specific lesson
+  courseId  String?  // If set, blocked for all lessons in this course
+  reason    String?
+  blockedBy String   // Admin who blocked the user
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lesson    Lessons? @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([lessonId])
+  @@index([courseId])
+  @@unique([userId, lessonId])
+  @@unique([userId, courseId])
+}
+
+model Banner {
+  id          String   @id @default(cuid())
+  imageUrl    String   // URL to the banner image
+  title       String?  // Optional title for the banner
+  description String?  // Optional description
+  order       Int      @default(0) // Display order in carousel
+  isActive    Boolean  @default(true)
+  width       Int?     // Image width in pixels
+  height      Int?     // Image height in pixels
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([isActive])
+  @@index([order])
+}
+
+model ClientLogo {
+  id          String   @id @default(cuid())
+  imageUrl    String   // URL to the logo image
+  name        String?  // Optional company name
+  order       Int      @default(0) // Display order
+  isActive    Boolean  @default(true)
+  width       Int?     // Image width in pixels
+  height      Int?     // Image height in pixels
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([isActive])
+  @@index([order])
+}
