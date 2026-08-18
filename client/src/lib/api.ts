@@ -1,9 +1,28 @@
 const getApiBaseUrl = () => {
-  const envUrl = import.meta.env.VITE_API_URL || "http://localhost:3000";
-  if (typeof window !== "undefined" && window.location.hostname !== "localhost" && envUrl.includes("localhost")) {
-    return envUrl.replace("localhost", window.location.hostname);
+  const envUrl = import.meta.env.VITE_API_URL;
+
+  if (typeof window !== "undefined") {
+    const hostname = window.location.hostname;
+    const isHttps = window.location.protocol === "https:";
+
+    // 1. If deployed on HTTPS (e.g. Vercel)
+    if (isHttps) {
+      if (envUrl && envUrl.startsWith("https://")) {
+        return envUrl;
+      }
+      if (envUrl && !envUrl.includes("localhost")) {
+        return envUrl.startsWith("http://") ? envUrl.replace("http://", "https://") : `https://${envUrl}`;
+      }
+    }
+
+    // 2. If running locally on LAN IP (e.g. 192.168.x.x) for colleague preview
+    const isPrivateIp = /^192\.168\.|^10\.|^172\.(1[6-9]|2\d|3[01])\./.test(hostname);
+    if (isPrivateIp && (!envUrl || envUrl.includes("localhost"))) {
+      return `http://${hostname}:3000`;
+    }
   }
-  return envUrl;
+
+  return envUrl || "http://localhost:3000";
 };
 
 const BASE_URL = `${getApiBaseUrl()}/api/v1`;
