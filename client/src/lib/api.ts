@@ -13,16 +13,18 @@ const getApiBaseUrl = () => {
       if (envUrl && !envUrl.includes("localhost")) {
         return envUrl.startsWith("http://") ? envUrl.replace("http://", "https://") : `https://${envUrl}`;
       }
+      // Production live backend on Render
+      return "https://nex-edu.onrender.com";
     }
 
     // 2. If running locally on LAN IP (e.g. 192.168.x.x) for colleague preview
     const isPrivateIp = /^192\.168\.|^10\.|^172\.(1[6-9]|2\d|3[01])\./.test(hostname);
-    if (isPrivateIp && (!envUrl || envUrl.includes("localhost"))) {
+    if (isPrivateIp) {
       return `http://${hostname}:3000`;
     }
   }
 
-  return envUrl || "http://localhost:3000";
+  return envUrl && !envUrl.includes("localhost") ? envUrl : "http://localhost:3000";
 };
 
 const BASE_URL = `${getApiBaseUrl()}/api/v1`;
