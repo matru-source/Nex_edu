@@ -4,7 +4,7 @@
   "description": "",
   "main": "dist/server.js",
   "scripts": {
-    "build": "pnpm prisma generate && pnpm prisma db push && tsc && tsc-alias",
+    "build": "prisma generate && tsc && tsc-alias",
     "start": "node dist/server.js",
     "dev": "tsx watch src/server.ts",
     "seed": "tsx prisma/seed.ts"
